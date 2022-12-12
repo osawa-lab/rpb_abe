@@ -6,6 +6,8 @@ import networkx as nx
 import string
 import matplotlib.pyplot as plt
 
+gammma = 0.6
+
 def rpd(action1, action2):
 
     point_list = np.array([[5,0], [10,1]])#得点[協力・協力の時,協力・裏切りの時],[裏切り・協力の時,裏切り]
@@ -25,14 +27,14 @@ class Agent():
         self.sum_point = 0
         self.pre_point = 0
         self.error = 0
-        self.accuracy = 0.1
+        self.likelifood = 3
         self.pre_action = 0
         
     def reset(self):
         self.sum_point = 0
         self.pre_point = 0
         self.error = 0
-        self.accuracy = 0.1
+        self.likelifood = 0.1
         self.pre_action = 0
 
 
@@ -53,7 +55,7 @@ class Agent():
         return action
 
     def judge_refusal(self,threshold):
-        if self.error >= threshold:
+        if self.likelifood <= threshold:
             return False
         else :
             return True
@@ -61,10 +63,11 @@ class Agent():
            
 
     def match_prediction(self,action):
+        p = 2
         if self.pre_action == action :
-            self.accuracy += 0.05
+            self.likelifood = self.likelifood*gammma + p * (1 - gammma)
         else :
-            self.error += self.accuracy
+            self.likelifood = self.likelifood * gammma 
         
 
     def agent_prediction(self,action,other_action):
@@ -144,7 +147,7 @@ agents = [Agent(2,belief) for belief in beliefs]
 
 other_action = [random.randint(0,1),random.randint(0,1)] #agent1とagent2の一つ前のactionを格納
 
-threshold = 2 #閾値
+threshold = 0.2 #閾値
 
 sum_game = 0 #総ゲーム数
 all = itertools.combinations(agents, 2)
