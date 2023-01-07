@@ -5,8 +5,11 @@ import itertools
 import networkx as nx
 import string
 import matplotlib.pyplot as plt
+from statistics import mean
 
-gammma = 0.6
+
+gamma = 0.6
+gamma_rand = 0.9
 
 def rpd(action1, action2):
 
@@ -20,21 +23,25 @@ def rpd(action1, action2):
 
 
 class Agent():
-    def __init__(self,action_list_num,belief):
+    def __init__(self,action_list_num,belief,id):
         self.belief = belief
+        self.id = id #各エージェントのID
         self.action_list_num = action_list_num
         self.agent_list =[]
+        self.expected_reward = 0 #期待報酬
+        self.action_log = {ID : [0,0] for ID, i in enumerate(range(10))} #各エージェントの行動回数
+        self.action_mean = {ID : [0] for ID, i in enumerate(range(10))} 
+        self.action_prob = [[0,0],[0,0]] #行動の確率[[協力][交互]]
         self.sum_point = 0
-        self.pre_point = 0
-        self.error = 0
-        self.likelifood = 3
+        self.likelifood = 2
         self.pre_action = 0
+        self.random = False
         
     def reset(self):
-        self.sum_point = 0
-        self.pre_point = 0
+        #self.sum_point = 0
+        
         self.error = 0
-        self.likelifood = 0.1
+        self.likelifood = 2
         self.pre_action = 0
 
 
@@ -64,10 +71,18 @@ class Agent():
 
     def match_prediction(self,action):
         p = 2
-        if self.pre_action == action :
-            self.likelifood = self.likelifood*gammma + p * (1 - gammma)
+        p_rand = 1
+        if self.random :
+            if self.pre_action == action:
+                self.likelifood = self.likelifood * gamma_rand + p_rand *(1 - gamma_rand)
+            else :
+                self.likelifood = self.likelifood * gamma_rand
+        
         else :
-            self.likelifood = self.likelifood * gammma 
+            if self.pre_action == action :
+                self.likelifood = self.likelifood * gamma + p * (1 - gamma)
+            else :
+                self.likelifood = self.likelifood * gamma 
         
 
     def agent_prediction(self,action,other_action):
@@ -76,9 +91,25 @@ class Agent():
         elif self.belief == 1 :
             if other_action == action :
                 self.pre_action = np.random.choice(range(self.action_list_num), p = np.array([0.5,0.5]))
+                self.random = True
             else :
                 self.pre_action = action
+                self.random = False
         
+    def count_action_log(self,action,otherID):
+        other_action = np.identity(2)[action]
+        self.action_log[otherID] += other_action
+        #print(self.action_log)
+
+
+    def log_mean(self,otherid):
+        sum_action = sum(self.action_log[otherid]) 
+        self.action_mean[otherid] = self.action_log[otherid]/sum_action   
+        print(self.action_mean)   
+
+
+
+
     
 
 
@@ -101,6 +132,7 @@ def plot(agents,game_list):
     G = nx.Graph()
     
     for agent in agents:
+        agent_id = agent.id
         if agent.belief == 0:
             G.add_node(agent,color = "red")
  
@@ -133,72 +165,77 @@ def plot(agents,game_list):
     plt.show()
 
 
-
-cooperation = [0]*5 #協力
-mutually = [1]*5
-#betrayal = [1]*4 #裏切り
-#Return = [2]*2 #しっぺ返し
-
-
-beliefs = np.array(cooperation + mutually)
-#np.random.shuffle(beliefs)
-agents = [Agent(2,belief) for belief in beliefs]
+for i in range(2):
+    cooperation = [0]*5 #協力
+    mutually = [1]*5
+    #betrayal = [1]*4 #裏切り
+    #Return = [2]*2 #しっぺ返し
 
 
-other_action = [random.randint(0,1),random.randint(0,1)] #agent1とagent2の一つ前のactionを格納
+    beliefs = np.array(cooperation + mutually)
+    #np.random.shuffle(beliefs)
+    agents =  [Agent(2,belief, id) for id, belief in enumerate(beliefs)]
 
-threshold = 0.2 #閾値
+    other_action = [random.randint(0,1),random.randint(0,1)] #agent1とagent2の一つ前のactionを格納
 
-sum_game = 0 #総ゲーム数
-all = itertools.combinations(agents, 2)
+    threshold = 0.2 #閾値
 
-game_list =[]
+    sum_game = 0 #総ゲーム数
+    all = itertools.combinations(agents, 2)
 
-for agent1,agent2 in all:
-    game_list = make_list(game_list,agent1,agent2)
-    
-    
-plot(agents,game_list)
+    game_list =[]
 
-all = itertools.combinations(agents, 2)
-
-
-for agent1,agent2 in all:
-    judge1 = True
-    judge2 = True
-    agent1.reset()
-    agent2.reset()
-    for i in range(25): #1エージェントの試合数
-        agent1_point = 0 #このゲームで与えられるポイントの初期化
-        agent2_point = 0 #このゲームで与えられるポイントの初期化
-        agent1.agent_prediction(other_action[0],other_action[1]) #行動予測
-        agent2.agent_prediction(other_action[1],other_action[0]) #行動予測
-        if judge1 and judge2:
-            action1= agent1.action(other_action[0],other_action[1]) #agent1のアクションを決定
-            action2= agent2.action(other_action[1],other_action[0]) #agent2のアクションを決定
-            print(i+1,"回目")
-            print(agent1.belief,agent2.belief)
-            print(action1,action2)
-            agent1_point,agent2_point = rpd(action1,action2)
-            agent1.sum_point += agent1_point
-            agent2.sum_point += agent2_point
-            other_action = [action1,action2]
-            agent1.match_prediction(other_action[1])
-            agent2.match_prediction(other_action[0])
-            sum_game += 1
-        else :
-            game_list = list_delete(game_list,agent1,agent2)
-            break
+    for agent1,agent2 in all:
+        game_list = make_list(game_list,agent1,agent2)
         
-        judge1 = agent1.judge_refusal(threshold)
-        judge2 = agent2.judge_refusal(threshold)
+        
+    plot(agents,game_list)
+ 
 
-    print(agent1.sum_point,agent2.sum_point)
-
-   
-
+    all = itertools.combinations(agents, 2)
 
 
-print(sum_game)
-plot(agents,game_list)
+    for agent1,agent2 in all:
+        judge1 = True
+        judge2 = True
+        agent1.reset()
+        agent2.reset()
+        for i in range(25): #1エージェントの試合数
+            agent1_point = 0 #このゲームで与えられるポイントの初期化
+            agent2_point = 0 #このゲームで与えられるポイントの初期化
+            agent1.agent_prediction(other_action[0],other_action[1]) #行動予測
+            agent2.agent_prediction(other_action[1],other_action[0]) #行動予測
+            if judge1 and judge2:
+                action1= agent1.action(other_action[0],other_action[1]) #agent1のアクションを決定
+                action2= agent2.action(other_action[1],other_action[0]) #agent2のアクションを決定
+                #print(i+1,"回目")
+                #print(agent1.belief,agent2.belief)
+                #print(action1,action2)
+                agent1_point,agent2_point = rpd(action1,action2)
+                agent1.sum_point += agent1_point
+                agent2.sum_point += agent2_point
+                other_action = [action1,action2]
+                agent1.count_action_log(action2,agent2.id)
+                agent2.count_action_log(action1,agent1.id)
+                agent1.match_prediction(other_action[1])#行動予測とあっているか
+                agent2.match_prediction(other_action[0])
+                sum_game += 1
+            else :
+                game_list = list_delete(game_list,agent1,agent2)
+                break
+            
+            judge1 = agent1.judge_refusal(threshold)
+            judge2 = agent2.judge_refusal(threshold)
+
+        #print(agent1.sum_point,agent2.sum_point)
+        agent1.log_mean(agent2.id)
+        agent2.log_mean(agent1.id)
+        
+
+    
+
+    for agent in agents:
+        print("戦略",agent.belief,"ポイント",agent.sum_point)
+    print("総ゲーム数",sum_game)
+    plot(agents,game_list)
 
