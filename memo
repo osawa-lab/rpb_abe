@@ -1,0 +1,48 @@
+for agent1,agent2 in comb_0:
+        print("agent1が",agent1.id)
+        print(agent2.id)
+        agent1.reset()
+        sum_game = 0 #総ゲーム数 
+        judge = True
+        mm_point1 = 0
+        mm_point2 = 0
+
+        for i in range(25): #1エージェントの試合数
+            if judge :
+                action1= agent1.action(other_action[0],other_action[1]) #agent1のアクションを決定
+                action2= agent2.action(other_action[1],other_action[0]) #agent2のアクションを決定
+                #print(i+1,"回目")
+                #print(agent1.belief,agent2.belief)
+                #print(action1,action2)
+                agent1_point,agent2_point = rpd(action1,action2)
+                agent1.sum_point += agent1_point
+                agent2.sum_point += agent2_point
+                other_action = [action1,action2]
+                agent1.count_action_log(action2,agent2.id)
+                #agent2.count_action_log(action1,agent1.id)
+                agent1.match_MM(agent2.id,mm_p1,mm_p2) #どのMMに近いか
+                mm_point1 += agent1.agent_predection(agent2.id,mm_p1,mm_p2,action1,0) #値の予測
+                mm_point2 += agent1.agent_predection(agent2.id,mm_p2,mm_p1,action1,1)
+                sum_game += 1
+            else :
+                comb_0_after = list_delete(comb_0_after,agent1,agent2)
+                break
+            
+            judge = agent1.point_judge(mm_point1,mm_point2)
+        
+        print(agent2.id,"とは",sum_game,"ゲームした")
+
+    plot(agents,comb_0_after)
+
+
+
+
+def match_MM(self,otherid,mm_p1,mm_p2):
+        prob = self.action_mean[otherid][0]
+        p1_p = np.abs(mm_p1-prob)
+        p2_p = np.abs(mm_p2-prob)
+        self.agent_match[otherid][0] = 1 - (p1_p / (p1_p + p2_p))
+        self.agent_match[otherid][1] = 1 - (p2_p / (p1_p + p2_p))
+
+        print("MM1っぽい確率",round(self.agent_match[otherid][0],3))
+        print("MM2っぽい確率",round(self.agent_match[otherid][1],3))

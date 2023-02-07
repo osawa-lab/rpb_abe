@@ -6,16 +6,23 @@ import networkx as nx
 import string
 import matplotlib.pyplot as plt
 from statistics import mean
-import compe
+import openpyxl
+
+#wb = openpyxl.load_workbook('/Users/abemasaki/Downloads/mind_model_abe_RPD/pre_main/main_d.xlsx')
+#ws = wb['Sheet1']
+#ws_p = wb["Sheet2"]
+#ws_l = wb["Sheet3"]
+#ws_r = wb["Sheet4"]
 
 
 
-gamma = 0.6
+
+gamma = 0.7
 gamma_rand = 0.9
 
 def rpd(action1, action2):
 
-    point_list = np.array([[5,0], [10,1]])#得点[協力・協力の時,協力・裏切りの時],[裏切り・協力の時,裏切り]
+    point_list = np.array([[4,0], [12,1]])#得点[協力・協力の時,協力・裏切りの時],[裏切り・協力の時,裏切り]
 
     agent1_point = point_list[action1, action2]
     agent2_point = point_list[action2, action1]
@@ -27,7 +34,6 @@ def rpd(action1, action2):
 class Agent():
     def __init__(self,action_list_num,belief,id):
         self.belief = belief
-        #self.MM = compe()
         self.id = id #各エージェントのID
         self.action_list_num = action_list_num
         self.agent_list =[]
@@ -39,12 +45,17 @@ class Agent():
         self.likelifood = 2
         self.pre_action = 0
         self.random = False
-        
+        self.dict = []
+        self.d = []
+
+
     def reset(self):
         #self.sum_point = 0
-        
+        self.dict = []
+        self.d = []
         self.error = 0
-        self.likelifood = 2
+        self.sum_point = 0
+        self.likelifood = 1
         self.pre_action = 0
 
 
@@ -53,13 +64,18 @@ class Agent():
     def action(self,self_action,other_action):
                         
         if self.belief == 0:
-            action = np.random.choice(range(self.action_list_num), p = np.array([0.9,0.1]))
+            action = 0
+            #np.random.choice(range(self.action_list_num), p = np.array([0.9,0.1]))
         elif self.belief == 1 :
-            action = np.random.choice(range(self.action_list_num), p = np.array([0.3,0.7]))
+            if self_action == other_action:
+                action = np.random.choice(range(self.action_list_num), p = np.array([0.4,0.6]))
+            else :
+                action = other_action 
        
+
         return action
 
-    #def judge_refusal(self,threshold):
+    def judge_refusal(self,threshold):
         if self.likelifood <= threshold:
             return False
         else :
@@ -67,8 +83,22 @@ class Agent():
     
            
 
-    def match_MM(self):
-        return 
+    def match_prediction(self,action):
+        p = 1
+
+        if self.random :
+            if self.pre_action == action:
+                self.likelifood = self.likelifood * gamma_rand + p *(1 - gamma_rand)
+            else :
+                self.likelifood = self.likelifood * gamma_rand
+        
+        else :
+            if self.pre_action == action :
+                self.likelifood = self.likelifood * gamma + p * (1 - gamma)
+            else :
+                self.likelifood = self.likelifood * gamma 
+
+        #self.dict.append(self.likelifood)
         
 
     def agent_prediction(self,action,other_action):
@@ -76,7 +106,7 @@ class Agent():
             self.pre_action = 0
         elif self.belief == 1 :
             if other_action == action :
-                self.pre_action = np.random.choice(range(self.action_list_num), p = np.array([0.5,0.5]))
+                self.pre_action = np.random.choice(range(self.action_list_num), p = np.array([0.3,0.7]))
                 self.random = True
             else :
                 self.pre_action = action
@@ -90,9 +120,12 @@ class Agent():
 
     def log_mean(self,otherid):
         sum_action = sum(self.action_log[otherid]) 
-        self.action_mean[otherid] = self.action_log[otherid]/sum_action   
-        print(self.id,"vs",otherid,self.action_mean[otherid],) 
-        print("ゲーム数",sum_action)  
+        self.action_mean[otherid] = self.action_log[otherid]/sum_action  
+        #self.dict.append(self.action_mean[otherid][0]) 
+
+        #print(self.dict)
+        #print(self.id,"vs",otherid,self.action_mean[otherid],) 
+        #print("ゲーム数",sum_action)  
 
 
 
@@ -147,11 +180,10 @@ def plot(agents,game_list):
 
 
 
-cooperation = [0]*10 #協力
-mutually = [1]*10 #交互
+cooperation = [0]*2 #協力
+mutually = [1]*2 #交互
 #betrayal = [1]*4 #裏切り
 #Return = [2]*2 #しっぺ返し
-
 
 
 beliefs = np.array(cooperation + mutually)
@@ -160,13 +192,10 @@ agents =  [Agent(2,belief, id) for id, belief in enumerate(beliefs)]
 
 other_action = [random.randint(0,1),random.randint(0,1)] #agent1とagent2の一つ前のactionを格納
 
-threshold = 0.2 #閾値
+threshold = 0.3 #閾値
 
 sum_game = 0 #総ゲーム数
 all = itertools.combinations(agents, 2)
-
-print(all)
-
 
 game_list =[]
 
@@ -180,13 +209,16 @@ plot(agents,game_list)
 all = itertools.combinations(agents, 2)
 
 
-
 for agent1,agent2 in all:
     judge1 = True
     judge2 = True
     agent1.reset()
     agent2.reset()
     for i in range(25): #1エージェントの試合数
+        agent1_point = 0 #このゲームで与えられるポイントの初期化
+        agent2_point = 0 #このゲームで与えられるポイントの初期化
+        agent1.agent_prediction(other_action[0],other_action[1]) #行動予測
+        agent2.agent_prediction(other_action[1],other_action[0]) #行動予測
         if judge1 and judge2:
             action1= agent1.action(other_action[0],other_action[1]) #agent1のアクションを決定
             action2= agent2.action(other_action[1],other_action[0]) #agent2のアクションを決定
@@ -196,6 +228,8 @@ for agent1,agent2 in all:
             agent1_point,agent2_point = rpd(action1,action2)
             agent1.sum_point += agent1_point
             agent2.sum_point += agent2_point
+            agent1.dict.append(agent1.sum_point)
+            agent2.dict.append(agent2.sum_point)
             other_action = [action1,action2]
             agent1.count_action_log(action2,agent2.id)
             agent2.count_action_log(action1,agent1.id)
@@ -205,19 +239,31 @@ for agent1,agent2 in all:
         else :
             game_list = list_delete(game_list,agent1,agent2)
             break
-        
-        judge1 = agent1.judge_refusal(threshold)
-        judge2 = agent2.judge_refusal(threshold)
-
+        agent1.log_mean(agent2.id)
+        agent2.log_mean(agent1.id) 
+        #judge1 = agent1.judge_refusal(threshold)
+        #judge2 = agent2.judge_refusal(threshold)
+    if agent1.belief == 0:
+        agent1.d = np.array(agent1.dict)
+        l_1 = agent1.belief,"vs",agent2.belief 
+        plt.plot(agent1.d,label = l_1)
+    if agent2.belief == 0:
+        agent2.d = np.array(agent2.dict)
+        l_2 = agent2.belief,"vs",agent1.belief
+        plt.plot(agent2.d,label = l_2)
+    plt.xlim(0, 25)
+    plt.ylim(0,200)
+    #plt.legend()
+    #plt.show()
     #print(agent1.sum_point,agent2.sum_point)
-    agent1.log_mean(agent2.id)
-    agent2.log_mean(agent1.id)
-    
+plt.legend(loc = (-0.2,-0.1))
+plt.savefig("r_0.png") 
+
+plt.show()
 
 
 
 for agent in agents:
     print("戦略",agent.belief,"ポイント",agent.sum_point)
 print("総ゲーム数",sum_game)
-plot(agents,game_list)
-
+#plot(agents,game_list)
