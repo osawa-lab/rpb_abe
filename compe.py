@@ -44,12 +44,21 @@ class Agent_lean():
         self.action_st = action_st
         #print(self.action_st)
         self.action_pre = 0
+        print("学習エージェントの確率")
+        if self.action_st == 0:
+            l = [[0.7,0.3],[0.8,0.2],[0.9,0.1]]
+            self.prob = np.array(random.choice(l))
+            print(self.prob)
+        else :
+            l = [[0.1,0.9], [0.2,0.8],[0.3,0.7]]
+            self.prob = np.array(random.choice(l))
+            print(self.prob)
         
     def action(self):
-        if self.action_st == 0:
-            return np.random.choice(range(2), p=[0.9,0.1])
-        else :
-            return np.random.choice(range(2), p=[0.3,0.7])
+        
+        return np.random.choice(range(2), p = self.prob)
+        
+            #return np.random.choice(range(2), p = prob)
             #if self.action_pre == 0:
             #    self.action_pre = 1
             #    return [1]
@@ -68,22 +77,34 @@ class Agent():
         self.action_mean = {ID : [0] for ID, i in enumerate(range(20))} 
         self.agent_match = {ID : [0.5,0.5] for ID, i in enumerate(range(20))}
         self.sum_point = 0
-
+        self._prob = []
         self.KL_p1 = []
         self.KL_p2 = []
+        self.prob_total = []
 
+        if belief == 0 :
+            l = [[0.7,0.3],[0.8,0.2],[0.9,0.1]]
+            self.prob = np.array(random.choice(l))
+           
+        else :
+            l = [[0.1,0.9], [0.2,0.8],[0.3,0.7]]
+            self.prob = np.array(random.choice(l))
+        
+        print(self.prob)
     def reset(self):
         self.sum_point = 0
         self.KL_p1 = []
         self.KL_p2 = []
+        self.prob_total = []
 
     def action(self,self_action,other_action):
-                        
-        if self.belief == 0:
+
+        action = np.random.choice(range(self.action_list_num), p = self.prob)    
+        #if self.belief == 0:
             #action = 0
-            action = np.random.choice(range(self.action_list_num), p = np.array([0.9,0.1]))
-        elif self.belief == 1 :
-            action = np.random.choice(range(self.action_list_num), p = np.array([0.4,0.6]))
+        #    action = np.random.choice(range(self.action_list_num), p = np.array([0.7,0.3]))
+        #elif self.belief == 1 :
+        #    action = np.random.choice(range(self.action_list_num), p = np.array([0.3,0.7]))
             #if self_action == other_action:
             #    action = np.random.choice(range(self.action_list_num), p = np.array([0.4,0.6]))
             #else :
@@ -130,12 +151,16 @@ class Agent():
         if prob == 1:
             KL_p1 = (prob * (np.log(prob) - np.log(mm_p1)))  
             KL_p2 = (prob * (np.log(prob) - np.log(mm_p2))) 
+        elif prob == 0:
+            KL_p1 = (1 - prob) * (np.log((1 - prob)) - np.log((1 - mm_p1)))
+            KL_p2 = (1 - prob) * (np.log((1 - prob)) - np.log((1 - mm_p2)))
         else :
             KL_p1 = (prob * (np.log(prob) - np.log(mm_p1))) + ((1 - prob) * (np.log((1 - prob)) - np.log((1 - mm_p1))))
             KL_p2 = (prob * (np.log(prob) - np.log(mm_p2))) + ((1 - prob) * (np.log((1 - prob)) - np.log((1 - mm_p2))))
         
         self.KL_p1.append(KL_p1)
         self.KL_p2.append(KL_p2)
+        self.prob_total.append(prob)
         print("KLダイバージェンスの値",round(KL_p1,2),round(KL_p2,2))
         if KL_p1 < KL_p2:
             print(round(mm_p1,2),"の方が近い:",round(KL_p1,2))
@@ -225,7 +250,7 @@ def get_MM():
     model.increase()
     dist=[]
     d=[]
-    for a in range(25):
+    for a in range(100):
         for agent in agents:
             actions = [np.eye(2)[agent.action()] for i in range(25)]
             st = np.mean(actions,axis=0)
@@ -236,15 +261,17 @@ def get_MM():
             if np.var(d[-10:]) <1e-8:
                 model.increase()
     dist= np.array(d)   
-    plt.plot(dist)
+    l = "dist"
+    plt.plot(dist,label = l)
+    plt.legend()
     plt.show()
     print(model.model)
     return model
 
 
 def game_rpd(model):
-    cooperation = [0]*2 #協力
-    mutually = [1]*2 #交互
+    cooperation = [0]*5 #協力
+    mutually = [1]*5 #交互
     mm_p1 = model.model[0][0]
     mm_p2 = model.model[1][0]
     print(mm_p1)
@@ -253,18 +280,18 @@ def game_rpd(model):
     agents =  [Agent(2,belief, id) for id, belief in enumerate(beliefs)]#agentの設定
     other_action = [random.randint(0,1),random.randint(0,1)] #agent1とagent2の一つ前のactionを格納
     comb_0 = []
-    comb_1 = []
+    #comb_1 = []
     comb_0_after = []
-    comb_1_after = []
+    #comb_1_after = []
     for i in agents:
         for j in agents:
             if i.id == 0 and j.id != 0:
                 make_list(comb_0,i,j)
                 make_list(comb_0_after,i,j)
             #elif i.id == 10 and j.id != 10:
-            elif i.id == 10 and j.id != 10:
-                make_list(comb_1,i,j)
-                make_list(comb_1_after,i,j)
+            #elif i.id == 10 and j.id != 10:
+            #    make_list(comb_1,i,j)
+            #    make_list(comb_1_after,i,j)
 
     plot(agents,comb_0)
     #plot(agents,comb_1)
@@ -305,20 +332,27 @@ def game_rpd(model):
         print(agent2.id,"とは",sum_game,"ゲームした")
         print(agent1.sum_point)
 
+        prob = np.array(agent1.prob_total)
+        l = agent2.belief,agent2.prob[0]
+        plt.xlim(0, 25)
+        plt.ylim(-0.5,1.3)
+        plt.plot(prob,label = l)
+        plt.legend()
+        plt.show()
+
         plt.xlim(0, 25)
         plt.ylim(-0.5,2)
         l = "mm_p1",mm_p1
         KL = np.array(agent1.KL_p1)
         plt.plot(KL,label = l)
         #plt.show()
-        #plt.xlim(0, 25)
-        #plt.ylim(-0.5,2)
+        
         l = "mm_p2",mm_p2
         KL = np.array(agent1.KL_p2)
         plt.plot(KL,label = l)
         plt.legend()
         plt.show()
-
+        
     #plot(agents,comb_0_after)
 
     
